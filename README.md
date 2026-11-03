@@ -6,7 +6,9 @@ NixOS for the original Valve Steam Link (2015; Marvell Berlin BG2CD, 2× Cortex-
 is left alone: without the stick, the Steam Link boots Valve's firmware as before.
 
 It is a headless box: Ethernet, USB, Wi-Fi/Bluetooth drivers, SSH. Mainline Linux has no
-driver for its display pipeline, audio or NAND, so HDMI stays dark once NixOS runs.
+driver for its display pipeline, audio or NAND, so HDMI stays dark once NixOS runs. For
+video on the TV (e.g. AirPlay mirroring), use the stock firmware with an app such as
+[steamlink-airplay](https://github.com/slopmaxxer/steamlink-airplay) instead.
 
 ## How it boots
 
