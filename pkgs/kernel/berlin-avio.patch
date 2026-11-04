@@ -1,0 +1,114 @@
+diff -Naur a/arch/arm/boot/dts/synaptics/berlin2cd-valve-steamlink-avio.dts b/arch/arm/boot/dts/synaptics/berlin2cd-valve-steamlink-avio.dts
+--- a/arch/arm/boot/dts/synaptics/berlin2cd-valve-steamlink-avio.dts	1970-01-01 00:00:00.000000000 +0000
++++ b/arch/arm/boot/dts/synaptics/berlin2cd-valve-steamlink-avio.dts	2026-11-04 15:56:05.829015719 +0000
+@@ -0,0 +1,57 @@
++// SPDX-License-Identifier: GPL-2.0
++/*
++ * Valve Steam Link with Marvell's AVIO drivers (galois_shm, galois_cc, galois_pe from
++ * the vendor kernel): the stock firmware's media server then drives HDMI, the video
++ * decoder and audio. Nodes as in the stock device tree; Linux keeps off the shared
++ * memory carveouts the media processors use, as the stock kernel did.
++ */
++#include "berlin2cd-valve-steamlink.dts"
++
++/ {
++	reserved-memory {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges;
++
++		/* galois_shm: cached (192 MiB) and uncached (32 MiB) pools */
++		shm@12000000 {
++			reg = <0x12000000 0x0e000000>;
++			no-map;
++		};
++	};
++
++	shm {
++		compatible = "mrvl,berlin-shm";
++		reg = <0x12000000 0x0c000000>, <0x1e000000 0x02000000>;
++	};
++
++	/* galois_pe: interrupts in the driver's order ZSP, AVIO0, AVIO1, AVIO2, VPRO */
++	pe {
++		compatible = "mrvl,berlin-pe";
++		interrupt-parent = <&gic>;
++		interrupts = <GIC_SPI 19 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 0 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 1 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 25 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 2 IRQ_TYPE_LEVEL_HIGH>;
++
++		cec {
++			compatible = "mrvl,berlin-cec";
++			interrupt-parent = <&sic>;
++			interrupts = <16>;
++		};
++	};
++
++	/* galois_gpio (/dev/gpio): the interrupts of the four APB and the SM GPIO ports */
++	gpio-apb {
++		compatible = "berlin,apb-gpio";
++		interrupt-parent = <&aic>;
++		interrupts = <0>, <1>, <2>, <3>;
++	};
++
++	gpio-sm {
++		compatible = "berlin,sm-gpio";
++		interrupt-parent = <&sic>;
++		interrupts = <11>, <4>;
++	};
++};
+diff -Naur a/arch/arm/boot/dts/synaptics/Makefile b/arch/arm/boot/dts/synaptics/Makefile
+--- a/arch/arm/boot/dts/synaptics/Makefile	2026-11-04 15:48:26.758143827 +0000
++++ b/arch/arm/boot/dts/synaptics/Makefile	2026-11-04 15:48:36.288624953 +0000
+@@ -3,4 +3,5 @@
+ 	berlin2-sony-nsz-gs7.dtb \
+ 	berlin2cd-google-chromecast.dtb \
+ 	berlin2cd-valve-steamlink.dtb \
++	berlin2cd-valve-steamlink-avio.dtb \
+ 	berlin2q-marvell-dmp.dtb
+diff -Naur a/arch/arm/mach-berlin/berlin.c b/arch/arm/mach-berlin/berlin.c
+--- a/arch/arm/mach-berlin/berlin.c	2026-11-04 15:48:26.750479706 +0000
++++ b/arch/arm/mach-berlin/berlin.c	2026-11-04 15:48:34.530629343 +0000
+@@ -9,14 +9,40 @@
+  */
+ 
+ #include <asm/mach/arch.h>
++#include <asm/mach/map.h>
+ 
+ static const char * const berlin_dt_compat[] = {
+ 	"marvell,berlin",
+ 	NULL,
+ };
+ 
++/*
++ * Marvell's AVIO drivers (galois_pe and its dhub HAL, from the vendor 3.8 kernel)
++ * dereference register addresses directly. Map the register window 1:1, as the vendor
++ * kernel did; it lies in the vmalloc area, which keeps static mappings out of its way.
++ */
++static struct map_desc berlin_io_desc[] __initdata = {
++	{
++		.virtual	= 0xf7000000,
++		.pfn		= __phys_to_pfn(0xf7000000),
++		.length		= 0x00cc0000,
++		.type		= MT_DEVICE,
++	}, {
++		.virtual	= 0xf7cd0000,
++		.pfn		= __phys_to_pfn(0xf7cd0000),
++		.length		= 0x00330000,
++		.type		= MT_DEVICE,
++	},
++};
++
++static void __init berlin_map_io(void)
++{
++	iotable_init(berlin_io_desc, ARRAY_SIZE(berlin_io_desc));
++}
++
+ DT_MACHINE_START(BERLIN_DT, "Marvell Berlin")
+ 	.dt_compat	= berlin_dt_compat,
++	.map_io		= berlin_map_io,
+ 	/*
+ 	 * with DT probing for L2CCs, berlin_init_machine can be removed.
+ 	 * Note: 88DE3005 (Armada 1500-mini) uses pl310 l2cc

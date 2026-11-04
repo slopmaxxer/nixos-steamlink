@@ -27,6 +27,13 @@ linux.override {
       name = "steamlink-defconfig";
       patch = defconfigPatch;
     }
+    {
+      # For Marvell's AVIO drivers (../galois-avio): the 1:1 register mapping they
+      # expect, and berlin2cd-valve-steamlink-avio.dtb, which adds their nodes and keeps
+      # Linux off the media memory. Harmless without them.
+      name = "berlin-avio";
+      patch = ./berlin-avio.patch;
+    }
   ];
   structuredExtraConfig = with lib.kernel; {
     # kexec hands over root=/init= through the device tree; never override them.
