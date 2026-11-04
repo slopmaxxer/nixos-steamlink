@@ -34,6 +34,11 @@ linux.override {
       name = "berlin-avio";
       patch = ./berlin-avio.patch;
     }
+    {
+      # /dev/watchdog on the watchdog Valve's firmware uses.
+      name = "steamlink-watchdog";
+      patch = ./steamlink-watchdog.patch;
+    }
   ];
   structuredExtraConfig = with lib.kernel; {
     # kexec hands over root=/init= through the device tree; never override them.
@@ -73,6 +78,16 @@ linux.override {
     EXT4_FS = yes;
     EXT4_FS_POSIX_ACL = yes;
     VFAT_FS = yes;
+
+    # reboot: the device tree's gpio-restart pulls SYS_RESET (GPIO A6, as Valve's kernel
+    # does); it needs the SoC's GPIO controller driver. Poweroff halts: the board cannot
+    # switch itself off.
+    GPIO_DWAPB = yes;
+    POWER_RESET = yes;
+    POWER_RESET_GPIO_RESTART = yes;
+    # Hardware watchdog (DesignWare; wdt4, see steamlink-watchdog.patch) for systemd.
+    WATCHDOG = yes;
+    DW_WATCHDOG = yes;
 
     # 512 MiB of RAM: compressed swap in RAM (zramSwap) rather than on the stick.
     SWAP = yes;

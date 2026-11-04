@@ -88,8 +88,9 @@ Update from a Linux machine with Nix that reaches it (the Steam Link never build
 nixos-rebuild switch --flake .#steamlink --target-host root@steamlink.local
 ```
 
-New kernels take effect at the next power cycle. `reboot` and `poweroff` do not return on
-this board: pull the plug.
+New kernels take effect at the next boot: `reboot` resets the board, the stock firmware
+starts and kexecs the new generation from the stick (untested on hardware; if it hangs,
+pull the plug). `poweroff` only halts.
 
 Recovery: if a generation does not boot, put the stick into another computer and copy
 `steamlink/generations/<n>.sh` over `steamlink/factory_test/run.sh` on the `FIRMWARE`
@@ -139,9 +140,20 @@ Status: builds; not yet tested on hardware. `journalctl -u steamlink-pe` and `dm
 Options: `hardware.steamlink.rootDevice` (default `PARTUUID=<sdImage disk id>-02`),
 `.bootDir` (`/boot/firmware`), `.generations` (5), `.dtb`, `.video.*` (above).
 
-Works: Ethernet, USB, Wi-Fi and Bluetooth drivers + firmware (configure networks
-yourself), temperature sensor, zram swap, nftables. HDMI, video decoding and audio only
-through `hardware.steamlink.video`. Does not work: NAND, RTC, suspend, reboot/poweroff.
+Hardware support:
+
+| Feature | State |
+|---|---|
+| Ethernet, USB, Wi-Fi + Bluetooth (mwifiex/btmrvl + firmware; configure networks yourself) | works |
+| Temperature sensor (berlin2-adc), zram swap, nftables | works |
+| Game controllers: built-in Steam Controller receiver (hid-steam), Xbox (xpad), PlayStation, Switch, Bluetooth HID | drivers built |
+| `reboot` | SYS_RESET via `gpio-restart` (GPIO A6, as Valve's kernel); the board restarts into the stock firmware, which boots the stick again |
+| Watchdog | `/dev/watchdog` on Valve's watchdog (dw_wdt); opt in with `systemd.watchdog.runtimeTime = "30s";` |
+| HDMI, H.264 decoding, HDMI audio, CEC | only with `hardware.steamlink.video` (experimental) |
+| `poweroff` | halts: the board cannot switch itself off (Valve's firmware only slows its clocks); pull the plug |
+| RTC | none on the board (not in Valve's kernel either); timesyncd sets the clock from the network and saves it across reboots |
+| Internal NAND | not supported on purpose: it holds the stock firmware in Valve's randomized/read-retry layout, which mainline's NAND driver does not handle, and a write could brick the device |
+| Suspend | none: no wake-up sources; Valve's firmware uses clock-slowing instead |
 
 ## Credits
 

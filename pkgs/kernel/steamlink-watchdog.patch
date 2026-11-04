@@ -1,0 +1,12 @@
+diff -Naur a/arch/arm/boot/dts/synaptics/berlin2cd-valve-steamlink.dts b/arch/arm/boot/dts/synaptics/berlin2cd-valve-steamlink.dts
+--- a/arch/arm/boot/dts/synaptics/berlin2cd-valve-steamlink.dts	2026-11-04 16:38:51.361064454 +0000
++++ b/arch/arm/boot/dts/synaptics/berlin2cd-valve-steamlink.dts	2026-11-04 16:38:55.993063253 +0000
+@@ -77,3 +77,8 @@
+ };
+ 
+ &eth1 { status = "okay"; };
++
++/* The watchdog Valve's firmware uses (mv88de3100_wdt at 0xf7e82000, hardware reset),
++ * instead of the SM one, so /dev/watchdog resets the whole board. */
++&wdt0 { status = "disabled"; };
++&wdt4 { status = "okay"; };

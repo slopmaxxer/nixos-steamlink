@@ -32,6 +32,11 @@ flake as input `nixos-steamlink`; nothing personal belongs here.
   PE on the stock firmware. Fast module rebuilds: `make -C <kernel.dev>/lib/modules/*/build
   M=<copy of src> modules` with the cross toolchain and `kernelModuleMakeFlags`.
   PE_Single_CPU under qemu-arm loads all libraries and stops at mapping /dev/mem (expected).
+- Hardware table in README. Reboot needed GPIO_DWAPB + POWER_RESET_GPIO_RESTART (the
+  mainline DT's gpio-restart on GPIO A6 had no driver); `steamlink-watchdog.patch` moves
+  the enabled watchdog from SM wdt0 to wdt4 (0xf7e82000, the one Valve's S80watchdog uses;
+  it starts after S01config, so it is never armed across the kexec). No RTC on the board,
+  NAND deliberately unsupported (Valve's randomizer/read-retry layout, brick risk).
 - Kernel options: `pkgs/kernel/steamlink_defconfig` (board, from steamlink-debian's 6.1 config)
   plus `structuredExtraConfig` in `pkgs/kernel/default.nix` (systemd/NixOS needs). buildLinux
   kernels skip NixOS's requiredKernelConfig assertions, so check the generated `.configfile`.
