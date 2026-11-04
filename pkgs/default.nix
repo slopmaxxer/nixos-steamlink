@@ -9,6 +9,8 @@ rec {
   };
   linuxPackages-steamlink = pkgs.linuxPackagesFor linux-steamlink;
   galois-avio = linuxPackages-steamlink.callPackage ./galois-avio { };
+  # Unfree (Valve's binaries); built for the board, it runs on any build machine.
+  steamlink-firmware = pkgs.callPackage ./steamlink-firmware { };
 
   # Runs on the stock firmware: static, and musl because static glibc refuses its 3.8 kernel.
   kexec-tools-steamlink = pkgs.pkgsStatic.callPackage ./kexec-tools { };
