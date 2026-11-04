@@ -690,23 +690,21 @@ int memory_engine_cache(memory_engine_t *engine, uint cmd,
 	}
 	up(&(engine->m_mutex));
 
+	/* Mainline exports no dmac_map_area() to modules: clean+invalidate the L1 lines
+	 * (by the caller's virtual address, as before) for all three, then act on L2. */
 	switch (cmd) {
 	case SHM_DEVICE_CMD_INVALIDATE:
-		dmac_map_area((const void *)op.m_param1,
-			      op.m_param2, DMA_FROM_DEVICE);
+		__cpuc_flush_dcache_area((void *)op.m_param1, op.m_param2);
 		outer_inv_range(op.m_param3,
 				op.m_param3 + op.m_param2);
 		break;
 	case SHM_DEVICE_CMD_CLEAN:
-		dmac_map_area((const void *)op.m_param1,
-			      op.m_param2, DMA_TO_DEVICE);
+		__cpuc_flush_dcache_area((void *)op.m_param1, op.m_param2);
 		outer_clean_range(op.m_param3,
 				  op.m_param3 + op.m_param2);
 		break;
 	case SHM_DEVICE_CMD_CLEANANDINVALIDATE:
-		dmac_flush_range((const void *)op.m_param1,
-				 (const void *)(op.m_param1 +
-						op.m_param2));
+		__cpuc_flush_dcache_area((void *)op.m_param1, op.m_param2);
 		outer_flush_range(op.m_param3,
 				  op.m_param3 + op.m_param2);
 		break;
@@ -863,8 +861,8 @@ int memory_engine_show(memory_engine_t *engine, struct seq_file *file)
 	if ((engine == NULL) || (file == NULL))
 		return -EINVAL;
 
-	len += seq_printf(file, "  No | Alloc |    Node    |    Addr     (Aligned)   |  Offset  |    Size    (Aligned)  |   Align  | thread id(name) \n");
-	len += seq_printf(file, "---------------------------------------------------------------------------------------------------\n");
+	seq_printf(file, "  No | Alloc |    Node    |    Addr     (Aligned)   |  Offset  |    Size    (Aligned)  |   Align  | thread id(name) \n");
+	seq_printf(file, "---------------------------------------------------------------------------------------------------\n");
 
 	down(&(engine->m_mutex));
 
@@ -877,7 +875,7 @@ int memory_engine_show(memory_engine_t *engine, struct seq_file *file)
 		else
 			ptr_tag = tag_used;
 
-		len += seq_printf(file, " %3d | %5s | 0x%08X | 0x%08X (0x%08X) | %8d | %9d (%9d) | %8d | 0x%08X(%s) \n",
+		seq_printf(file, " %3d | %5s | 0x%08X | 0x%08X (0x%08X) | %8d | %9d (%9d) | %8d | 0x%08X(%s) \n",
 			++i, ptr_tag, (size_t)new_node,
 			new_node->m_addr, MEMNODE_ALIGN_ADDR(new_node), (MEMNODE_ALIGN_ADDR(new_node) - engine->m_base),
 			new_node->m_size, MEMNODE_ALIGN_SIZE(new_node),
@@ -1232,13 +1230,13 @@ int memory_engine_show_stat(memory_engine_t *engine, struct seq_file *file)
 		goto err_exit;
 	}
 
-	len += seq_printf(file,"total size : %d \nused : %d \ntask count : %d\n",
+	seq_printf(file,"total size : %d \nused : %d \ntask count : %d\n",
 			stat_info->m_size,stat_info->m_used,stat_info->m_count);
 
-	len += seq_printf(file,"  No |  task id(      name      ) | oom_adj |    alloc   |     use    |\n");
-	len += seq_printf(file,"-----------------------------------------------------------------------\n");
+	seq_printf(file,"  No |  task id(      name      ) | oom_adj |    alloc   |     use    |\n");
+	seq_printf(file,"-----------------------------------------------------------------------\n");
 	for (i = 0 ; i < stat_info->m_count ; i++)
-		len += seq_printf(file, " %3d | %8d(%16s) |   %3d   | %10d | %10d |\n", i, stat_info->m_nodes[i].m_taskid,
+		seq_printf(file, " %3d | %8d(%16s) |   %3d   | %10d | %10d |\n", i, stat_info->m_nodes[i].m_taskid,
 					stat_info->m_nodes[i].m_taskname, stat_info->m_nodes[i].m_oom_adj,
 					stat_info->m_nodes[i].m_size_alloc, stat_info->m_nodes[i].m_size_use);
 

@@ -1,0 +1,20 @@
+# Marvell's Berlin AVIO drivers (Valve's 3.8.13-mrvl kernel), built out of tree against
+# mainline for the BG2CD only. Same flags as mach-berlin/mv88de3100.mk and the module
+# Makefiles there. The Steam Link kernel had BERLIN_FASTLOGO=y, which makes pe defer the
+# dhub setup to the first open and power down the HDMI TX first; keep that behaviour.
+ccflags-y := -DBERLIN -DSoC_Galois -D__LINUX_KERNEL__ -D__CODE_LINK__=0 -DCPUINDEX=0 \
+	-DBERLIN_B_0=0x1000 -DBERLIN_C_0=0x2000 -DBERLIN_BG2=0x3000 -DBERLIN_BG2_Z2=0x3010 \
+	-DBERLIN_BG2_A0=0x3020 -DBERLIN_BG2CD_A0=0x3100 -DBERLIN_BG3=0x4000 \
+	-DBERLIN_CHIP_VERSION=BERLIN_BG2CD_A0 -DBERLIN_SINGLE_CPU \
+	-DCONFIG_BERLIN_FASTLOGO \
+	-I$(src)/include -I$(src)/shm -I$(src)/cc -I$(src)/dhub \
+	-I$(src)/pe/gsinc -I$(src)/pe/gsinc/Firmware_Berlin_BG2CD_A0
+
+obj-m := galois_shm.o galois_cc.o galois_pe.o galois_gpio.o
+
+galois_shm-y := shm/shm_driver.o shm/shm_device.o shm/memory_engine.o shm/shm_api_kernel.o
+galois_cc-y := cc/cc_driver.o cc/cc_std_map.o cc/cc_list.o cc/cc_cbuf_body.o \
+	cc/cc_cbuf_server.o cc/cc_dss.o cc/cc_udp.o cc/cc_msgq.o
+galois_pe-y := pe/pe_driver.o pe/avio_dhub_drv.o pe/pe_agent_driver.o dhub/hal_dhub.o
+# /dev/gpio, used by the firmware's libBoard (mach-berlin/gpio.c + modules/gpio).
+galois_gpio-y := gpio/gpio.o gpio/gpio_main.o

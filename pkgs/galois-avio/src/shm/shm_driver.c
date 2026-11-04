@@ -124,11 +124,13 @@ static shm_driver_cdev_t shm_driver_dev_list[] = {
 
 static struct proc_dir_entry *shm_driver_procdir;
 
-static struct task_struct* shm_lowmem_deathpending;
+/* Mainline has no task_free notifier (an Android addition), so remember the pid
+ * instead of the task and let the one second timeout expire the pending kill. */
+static pid_t shm_lowmem_deathpending;
 static unsigned long shm_lowmem_deathpending_timeout;
 static int shm_lowmem_going;
 static struct shm_stat_info shm_stat;
-static DEFINE_SEMAPHORE(shm_lowmem_mutex);
+static DEFINE_SEMAPHORE(shm_lowmem_mutex, 1);
 /*********************** shm lowmem killer *****************************/
 
 #define shm_lowmem_print(level, x...)   \
@@ -136,16 +138,6 @@ static DEFINE_SEMAPHORE(shm_lowmem_mutex);
 		if (shm_lowmem_debug_level >= (level)) \
 			printk(x);                  \
 	}while(0)
-
-static int shm_task_notify_func(struct notifier_block* self, unsigned long val, void *data)
-{
-	struct task_struct *task = data;
-
-	if (task == shm_lowmem_deathpending)
-		shm_lowmem_deathpending = NULL;
-
-	return NOTIFY_OK;
-}
 
 static void shm_shrink_dump_usage(struct shm_stat_info *stat_info,int print_level)
 {
@@ -208,7 +200,7 @@ static int shm_lowmem_shrink_killer(int allocsize)
 				time_before_eq(jiffies,shm_lowmem_deathpending_timeout)) {
 			/* no shrinking is executing, but exists pending task*/
 			up(&shm_lowmem_mutex);
-			shm_lowmem_print(2,"a pending task exists pid(%d)\n",shm_lowmem_deathpending->pid);
+			shm_lowmem_print(2,"a pending task exists pid(%d)\n",shm_lowmem_deathpending);
 			return 0;
 		}
 		shm_lowmem_going = 1;
@@ -226,7 +218,7 @@ static int shm_lowmem_shrink_killer(int allocsize)
 	/* find task whose oom-adj larger than
 	 * and use largest shm memory size than allocsize
 	 */
-	read_lock(&tasklist_lock);
+	rcu_read_lock();
 	for_each_process(p) {
 		struct mm_struct *mm;
 		struct signal_struct *sig;
@@ -277,13 +269,14 @@ static int shm_lowmem_shrink_killer(int allocsize)
 				selected->pid, selected->comm,
 				selected_oom_adj, selected_shmsize);
 
-		force_sig(SIGTERM, selected);
+		send_sig(SIGTERM, selected, 1);
 	} else {
 		shm_lowmem_print(2,"shm_lowmem_killer alert!!!! no task selected to release\n");
 		shm_shrink_dump_usage(&shm_stat, 2);
 	}
 
-	read_unlock(&tasklist_lock);
+	shm_lowmem_deathpending = selected ? selected->pid : 0;
+	rcu_read_unlock();
 	res = 0;
 
 _exit_entry:
@@ -291,20 +284,13 @@ _exit_entry:
 	down(&shm_lowmem_mutex);
 
 	shm_lowmem_going = 0;
-	if (selected) {
-		shm_lowmem_deathpending = selected;
+	if (shm_lowmem_deathpending)
 		shm_lowmem_deathpending_timeout = jiffies + HZ;
-	}else
-		shm_lowmem_deathpending = NULL;
 
 	up(&shm_lowmem_mutex);
 
 	return res;
 }
-
-static struct notifier_block shm_task_nb = {
-	.notifier_call = shm_task_notify_func,
-};
 
 /*******************************************************************************
   Module API
@@ -598,18 +584,6 @@ static int meminfo_proc_show(struct seq_file *m, void *v)
 	return 0;
 }
 
-static int meminfo_proc_open(struct inode *inode, struct file *file)
-{
-	return single_open(file, meminfo_proc_show, NULL);
-}
-
-static const struct file_operations meminfo_proc_fops = {
-	.open		= meminfo_proc_open,
-	.read		= seq_read,
-	.llseek		= seq_lseek,
-	.release	= single_release,
-};
-
 static int baseinfo_proc_show(struct seq_file *m, void *v)
 {
 	int res;
@@ -645,18 +619,6 @@ static int baseinfo_proc_show(struct seq_file *m, void *v)
 
 	return 0;
 }
-
-static int baseinfo_proc_open(struct inode *inode, struct file *file)
-{
-	return single_open(file, baseinfo_proc_show, NULL);
-}
-
-static const struct file_operations baseinfo_proc_fops = {
-	.open		= baseinfo_proc_open,
-	.read		= seq_read,
-	.llseek		= seq_lseek,
-	.release	= single_release,
-};
 
 static int detail_seq_show(struct seq_file *file, void *data)
 {
@@ -701,18 +663,6 @@ static struct seq_operations detail_seq_ops = {
 	.show		= detail_seq_show
 };
 
-static int detail_proc_open(struct inode *inode, struct file *file)
-{
-	return seq_open(file, &detail_seq_ops);
-}
-
-static struct file_operations detail_proc_ops = {
-	.open		= detail_proc_open,
-	.read		= seq_read,
-	.llseek		= seq_lseek,
-	.release	= seq_release
-};
-
 static int shm_stat_seq_show(struct seq_file *file, void *data)
 {
 	shm_device_t *pShmdev = (shm_device_t *) data;
@@ -751,19 +701,6 @@ static struct seq_operations shm_stat_seq_ops = {
 	.show		= shm_stat_seq_show
 };
 
-static int shm_stat_proc_open(struct inode *inode, struct file *file)
-{
-	return seq_open(file, &shm_stat_seq_ops);
-}
-
-static struct file_operations shm_stat_file_ops = {
-	.owner		= THIS_MODULE,
-	.open		= shm_stat_proc_open,
-	.read		= seq_read,
-	.llseek		= seq_lseek,
-	.release	= seq_release
-};
-
 static int shm_driver_setup_cdev(struct cdev *dev, int major, int minor,
 				 struct file_operations *fops)
 {
@@ -778,8 +715,6 @@ static int __init shm_driver_init(void)
 	int res, i;
 	struct device_node *np;
 	struct resource r;
-	struct proc_dir_entry *pent = NULL;
-	struct proc_dir_entry *pstat = NULL;
 
 	np = of_find_compatible_node(NULL, NULL, "mrvl,berlin-shm");
 	if (!np)
@@ -821,7 +756,7 @@ static int __init shm_driver_init(void)
 	}
 
 	/* add shm devices to sysfs */
-	shm_dev_class = class_create(THIS_MODULE, SHM_DEVICE_NAME);
+	shm_dev_class = class_create(SHM_DEVICE_NAME);
 	if (IS_ERR(shm_dev_class)) {
 		shm_error("class_create failed.\n");
 		res = -ENODEV;
@@ -869,18 +804,11 @@ static int __init shm_driver_init(void)
 		shm_error(KERN_WARNING "Failed to mkdir /proc/%s\n", SHM_DEVICE_NAME);
 		return 0;
 	}
-	proc_create("meminfo", 0, shm_driver_procdir, &meminfo_proc_fops);
-	proc_create("baseinfo", 0, shm_driver_procdir, &baseinfo_proc_fops);
+	proc_create_single("meminfo", 0, shm_driver_procdir, meminfo_proc_show);
+	proc_create_single("baseinfo", 0, shm_driver_procdir, baseinfo_proc_show);
+	proc_create_seq("detail", 0, shm_driver_procdir, &detail_seq_ops);
+	proc_create_seq("stat", 0, shm_driver_procdir, &shm_stat_seq_ops);
 
-	pent = create_proc_entry("detail", 0, shm_driver_procdir);
-	if (pent)
-		pent->proc_fops = &detail_proc_ops;
-
-	pstat = create_proc_entry("stat", 0, shm_driver_procdir);
-	if (pstat)
-		pstat->proc_fops = &shm_stat_file_ops;
-
-	task_free_register(&shm_task_nb);
 	shm_trace("shm_driver_init OK\n");
 
 	return 0;
@@ -920,8 +848,6 @@ err_node:
 static void __exit shm_driver_exit(void)
 {
 	int res, i;
-
-	task_free_unregister(&shm_task_nb);
 
 	/* destroy shm kernel API */
 	res = MV_SHM_Exit();

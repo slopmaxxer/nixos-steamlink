@@ -344,18 +344,6 @@ static int status_proc_show(struct seq_file *m, void *v)
 	return 0;
 }
 
-static int status_proc_open(struct inode *inode, struct file *file)
-{
-	return single_open(file, status_proc_show, NULL);
-}
-
-static const struct file_operations status_proc_fops = {
-	.open		= status_proc_open,
-	.read		= seq_read,
-	.llseek		= seq_lseek,
-	.release	= single_release,
-};
-
 static void *detail_seq_start(struct seq_file *s, loff_t *pos)
 {
 	pMV_CC_DSS_ServiceInfo_DataList_t p;
@@ -439,18 +427,6 @@ static struct seq_operations detail_seq_ops = {
 	.show		= detail_seq_show
 };
 
-static int detail_proc_open(struct inode *inode, struct file *file)
-{
-	return seq_open(file, &detail_seq_ops);
-}
-
-static const struct file_operations detail_proc_fops = {
-	.open		= detail_proc_open,
-	.read		= seq_read,
-	.llseek		= seq_lseek,
-	.release	= seq_release,
-};
-
 /*******************************************************************************
   Module Register API
  */
@@ -485,7 +461,7 @@ static int __init cc_driver_init(void)
 	cc_debug("setup cdevs device minor [%d]\n", GALOIS_CCNEW_MINOR);
 
 	/* add cc devices to sysfs */
-	cc_dev_class = class_create(THIS_MODULE, CC_DEVICE_NAME);
+	cc_dev_class = class_create(CC_DEVICE_NAME);
 	if (IS_ERR(cc_dev_class)) {
 		cc_error("class_create failed.\n");
 		res = -ENODEV;
@@ -514,8 +490,8 @@ static int __init cc_driver_init(void)
 		return 0;
 	}
 
-	proc_create(CC_DEVICE_PROCFILE_STATUS, 0, cc_driver_procdir, &status_proc_fops);
-	proc_create(CC_DEVICE_PROCFILE_DETAIL, 0, cc_driver_procdir, &detail_proc_fops);
+	proc_create_single(CC_DEVICE_PROCFILE_STATUS, 0, cc_driver_procdir, status_proc_show);
+	proc_create_seq(CC_DEVICE_PROCFILE_DETAIL, 0, cc_driver_procdir, &detail_seq_ops);
 
 	cc_trace("cc_driver_init OK\n");
 

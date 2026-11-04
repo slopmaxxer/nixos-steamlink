@@ -234,15 +234,14 @@ struct shm_device_priv_data
 static int inline shm_find_oomadj_by_pid (pid_t taskid)
 {
 	struct task_struct *task = NULL;
-	struct signal_struct *sig = NULL;
+	int oom_adj = UNKNOWN_OOM_ADJ;
 
-	task = find_task_by_vpid (taskid);
-	if (task) {
-		sig = task->signal;
-
-		if (sig)
-			return sig->oom_score_adj;
-	}
-	return UNKNOWN_OOM_ADJ;
+	/* find_task_by_vpid() is not exported on mainline. */
+	rcu_read_lock();
+	task = pid_task(find_vpid(taskid), PIDTYPE_PID);
+	if (task && task->signal)
+		oom_adj = task->signal->oom_score_adj;
+	rcu_read_unlock();
+	return oom_adj;
 }
 #endif /* __shm_type_h__ */

@@ -1,12 +1,14 @@
 # Steam Link packages for an armv7l package set (native, or cross like
 # pkgsCross.armv7l-hf-multiplatform).
 { pkgs }:
-{
+rec {
   # Plain import, not callPackage: linuxPackagesFor needs the kernel's own .override.
   linux-steamlink = import ./kernel {
     inherit (pkgs) lib runCommand;
     linux = pkgs.linux_6_18;
   };
+  linuxPackages-steamlink = pkgs.linuxPackagesFor linux-steamlink;
+  galois-avio = linuxPackages-steamlink.callPackage ./galois-avio { };
 
   # Runs on the stock firmware: static, and musl because static glibc refuses its 3.8 kernel.
   kexec-tools-steamlink = pkgs.pkgsStatic.callPackage ./kexec-tools { };

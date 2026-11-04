@@ -38,8 +38,8 @@
 #include <linux/device.h>
 #include <linux/version.h>
 
-#include <asm-generic/current.h>
-#include <linux/sched.h>
+#include <linux/seq_file.h>
+#include <linux/uaccess.h>
 
 /*******************************************************************************
   Local head files
@@ -160,7 +160,7 @@ static int pe_agent_driver_release(struct inode *inode, struct file *filp)
 	for (i = 0; i < MAX_NUM_PE_AGENT_INSTANCES; i++) {
 		if (instance_list[i].filp == filp) {
 			msg.m_MsgID = PE_MODULE_MSG_TYPE_AGENT_TERM;
-			msg.m_Param1 = instance_list[i].handle;
+			msg.m_Param1 = (UINT32)instance_list[i].handle;
 			msg.m_Param2 = instance_list[i].tgid;
 
 			pe_handle = instance_list[i].handle;
@@ -226,7 +226,7 @@ static long pe_agent_driver_ioctl_unlocked(struct file *filp, unsigned int cmd,
 		for (i = 0; i < MAX_NUM_PE_AGENT_INSTANCES; i++) {
 			if (instance_list[i].filp
 			    && instance_list[i].token == msg.m_MsgID) {
-				instance_list[i].handle = msg.m_Param1;
+				instance_list[i].handle = (HANDLE)msg.m_Param1;
 
 				spin_unlock(&pe_agent_spinlock);
 				pe_agent_debug
@@ -250,45 +250,26 @@ static long pe_agent_driver_ioctl_unlocked(struct file *filp, unsigned int cmd,
 	return res;
 }
 
-static int read_proc_status(char *page, char **start, off_t offset,
-			    int count, int *eof, void *data)
+static int read_proc_status(struct seq_file *m, void *v)
 {
-	int len = 0;
 	int i = 0;
 
-	len +=
-	    sprintf(page + len, "pe_instance_cnt:%d\n", pe_agent_instance_cnt);
+	seq_printf(m, "pe_instance_cnt:%d\n", pe_agent_instance_cnt);
+	seq_puts(m, "----------------------------------------------------------------\n");
+	seq_puts(m, "  No  |    filp     |     tgid      |  PE handle   |  token\n");
+	seq_puts(m, "----------------------------------------------------------------\n");
 
-	len +=
-	    sprintf(page + len,
-		    "----------------------------------------------------------------\n");
-	len +=
-	    sprintf(page + len,
-		    "  No  |    filp     |     tgid      |  PE handle   |  token\n");
-	len +=
-	    sprintf(page + len,
-		    "----------------------------------------------------------------\n");
-
-	for (i = 0; (i < MAX_NUM_PE_AGENT_INSTANCES) && (len < count - 200);
-	     i++) {
+	for (i = 0; i < MAX_NUM_PE_AGENT_INSTANCES; i++) {
 		if (instance_list[i].filp) {
-			len +=
-			    sprintf(page + len,
-				    " %2d  |  0x%08x  |     %08d  |  0x%08x  | 0x%08x\n",
-				    i, instance_list[i].filp,
-				    instance_list[i].tgid,
-				    instance_list[i].handle,
-				    instance_list[i].token);
+			seq_printf(m, " %2d  |  0x%p  |     %08d  |  0x%p  | 0x%08x\n",
+				   i, instance_list[i].filp,
+				   instance_list[i].tgid,
+				   instance_list[i].handle,
+				   instance_list[i].token);
 		}
-
 	}
 
-	pe_agent_debug("%s OK. (%d / %d)\n", __func__, len, count);
-
-	*eof = 1;
-
-	return ((count < len) ? count : len);
-
+	return 0;
 }
 
 /*******************************************************************************
@@ -319,7 +300,7 @@ int __init pe_agent_driver_init(void)
 		       GALOIS_PE_AGENT_MINOR);
 
 	/* add PE agent devices to sysfs */
-	pe_agent_dev_class = class_create(THIS_MODULE, PE_AGENT_DEVICE_NAME);
+	pe_agent_dev_class = class_create(PE_AGENT_DEVICE_NAME);
 	if (IS_ERR(pe_agent_dev_class)) {
 		pe_agent_error("class_create failed.\n");
 		res = -ENODEV;
@@ -334,8 +315,8 @@ int __init pe_agent_driver_init(void)
 	/* create PE agent device proc file */
 	pe_agent_driver_procdir = proc_mkdir(PE_AGENT_DEVICE_NAME, NULL);
 	/*pe_driver_procdir->owner = THIS_MODULE; */
-	create_proc_read_entry(PE_AGENT_DEVICE_PROCFILE_STATUS, 0,
-			       pe_agent_driver_procdir, read_proc_status, NULL);
+	proc_create_single(PE_AGENT_DEVICE_PROCFILE_STATUS, 0,
+			   pe_agent_driver_procdir, read_proc_status);
 
 	pe_agent_instance_cnt = 0;
 

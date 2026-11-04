@@ -60,7 +60,8 @@
           steamlinkPkgs = import ./pkgs { inherit (system) pkgs; };
         in
         {
-          inherit (steamlinkPkgs) linux-steamlink kexec-tools-steamlink;
+          # Not steamlink-firmware: unfree, and only pulled in by hardware.steamlink.video.
+          inherit (steamlinkPkgs) linux-steamlink kexec-tools-steamlink galois-avio;
           example-image = system.config.system.build.sdImage;
           example-toplevel = system.config.system.build.toplevel;
           default = self.packages.${buildSystem}.example-image;
@@ -82,6 +83,7 @@
         inherit (self.packages.x86_64-linux)
           linux-steamlink
           kexec-tools-steamlink
+          galois-avio
           example-image
           example-toplevel
           ;

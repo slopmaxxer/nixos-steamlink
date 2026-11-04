@@ -54,19 +54,11 @@ shm_device_t *shm_api_device_cache = NULL;
 
 shm_device_t *shm_api_device_noncache = NULL;
 
+/* Cached kernel mapping of the shm carveout (a no-map reserved-memory region on mainline,
+ * so ARM's ioremap_cache() accepts it). */
 static unsigned long MV_SHM_ioremap(unsigned long phys_start, unsigned long size)
 {
-	struct vm_struct *area;
-
-	area = get_vm_area(size, VM_IOREMAP);
-	if (area == NULL)
-		return ((uint) NULL);
-
-	if (ioremap_page_range((unsigned long)area->addr,
-		(unsigned long)area->addr + size, phys_start, PAGE_KERNEL)) {
-		return ((uint) NULL);
-	}
-	return area->addr;
+	return (unsigned long)ioremap_cache(phys_start, size);
 }
 
 
@@ -99,7 +91,7 @@ int MV_SHM_Init(shm_device_t * device_noncache, shm_device_t * device_cache)
 		  MV_SHM_NONCACHE_BASEINFO_DATA.m_size);
 	MV_SHM_NONCACHE_BASEINFO_DATA.m_base_virtaddr =
 	    (uint)
-	    ioremap_nocache(MV_SHM_NONCACHE_BASEINFO_DATA.m_base_physaddr,
+	    ioremap(MV_SHM_NONCACHE_BASEINFO_DATA.m_base_physaddr,
 			    MV_SHM_NONCACHE_BASEINFO_DATA.m_size);
 	if (MV_SHM_NONCACHE_BASEINFO_DATA.m_base_virtaddr == (uint) NULL) {
 		shm_error("ioremap_nocache failed.");

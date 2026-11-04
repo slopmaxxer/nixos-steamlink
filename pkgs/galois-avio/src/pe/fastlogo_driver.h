@@ -19,10 +19,7 @@
 #ifndef __fastlogo_driver_h__
 #define __fastlogo_driver_h__
 
-#ifdef CONFIG_BERLIN_FASTLOGO
-void fastlogo_stop(void);
-#else
+/* Mainline has no fastlogo driver: the bootloader's logo is all that runs before PE. */
 static inline void fastlogo_stop(void) {}
-#endif
 
 #endif

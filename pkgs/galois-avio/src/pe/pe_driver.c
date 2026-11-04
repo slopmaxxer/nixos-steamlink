@@ -67,7 +67,7 @@
 #include "api_dhub.h"
 
 #ifdef CONFIG_BERLIN_FASTLOGO
-#include "../fastlogo/fastlogo_driver.h"
+#include "fastlogo_driver.h"
 static int pe_cpu_id = 0;
 static int dhub_init_flag =0;
 #endif
@@ -260,7 +260,7 @@ typedef struct INTR_MSG_T {
 /////////////////////////////////////////End of NEW_ISR
 
 static void pe_vip_do_tasklet(unsigned long);
-DECLARE_TASKLET_DISABLED(pe_vip_tasklet, pe_vip_do_tasklet, 0);
+static DECLARE_TASKLET_DISABLED_OLD(pe_vip_tasklet, pe_vip_do_tasklet);
 
 #define VIP_MSG_DESTROY_ISR_TASK   1
 #endif
@@ -303,19 +303,19 @@ static void pe_rle_do_done_tasklet(unsigned long);
 static void aout_resume_cmd(int path_id);
 static void aip_resume_cmd(void);
 
-static DECLARE_TASKLET_DISABLED(pe_vpp_tasklet, pe_vpp_do_tasklet, 0);
-static DECLARE_TASKLET_DISABLED(pe_vpp_cec_tasklet, pe_vpp_cec_do_tasklet, 0);
-static DECLARE_TASKLET_DISABLED(pe_vdec_tasklet, pe_vdec_do_tasklet, 0);
-static DECLARE_TASKLET_DISABLED(pe_ma_tasklet, pe_ma_do_tasklet, 0);
-static DECLARE_TASKLET_DISABLED(pe_sa_tasklet, pe_sa_do_tasklet, 0);
-static DECLARE_TASKLET_DISABLED(pe_spdif_tasklet, pe_spdif_do_tasklet, 0);
-static DECLARE_TASKLET_DISABLED(pe_aip_tasklet, pe_aip_do_tasklet, 0);
-static DECLARE_TASKLET_DISABLED(pe_hdmi_tasklet, pe_hdmi_do_tasklet, 0);
-static DECLARE_TASKLET_DISABLED(pe_app_tasklet, pe_app_do_tasklet, 0);
-static DECLARE_TASKLET_DISABLED(pe_zsp_tasklet, pe_zsp_do_tasklet, 0);
-static DECLARE_TASKLET_DISABLED(pe_pg_done_tasklet, pe_pg_dhub_done_tasklet, 0);
-static DECLARE_TASKLET_DISABLED(pe_rle_err_tasklet, pe_rle_do_err_tasklet, 0);
-static DECLARE_TASKLET_DISABLED(pe_rle_done_tasklet, pe_rle_do_done_tasklet, 0);
+static DECLARE_TASKLET_DISABLED_OLD(pe_vpp_tasklet, pe_vpp_do_tasklet);
+static DECLARE_TASKLET_DISABLED_OLD(pe_vpp_cec_tasklet, pe_vpp_cec_do_tasklet);
+static DECLARE_TASKLET_DISABLED_OLD(pe_vdec_tasklet, pe_vdec_do_tasklet);
+static DECLARE_TASKLET_DISABLED_OLD(pe_ma_tasklet, pe_ma_do_tasklet);
+static DECLARE_TASKLET_DISABLED_OLD(pe_sa_tasklet, pe_sa_do_tasklet);
+static DECLARE_TASKLET_DISABLED_OLD(pe_spdif_tasklet, pe_spdif_do_tasklet);
+static DECLARE_TASKLET_DISABLED_OLD(pe_aip_tasklet, pe_aip_do_tasklet);
+static DECLARE_TASKLET_DISABLED_OLD(pe_hdmi_tasklet, pe_hdmi_do_tasklet);
+static DECLARE_TASKLET_DISABLED_OLD(pe_app_tasklet, pe_app_do_tasklet);
+static DECLARE_TASKLET_DISABLED_OLD(pe_zsp_tasklet, pe_zsp_do_tasklet);
+static DECLARE_TASKLET_DISABLED_OLD(pe_pg_done_tasklet, pe_pg_dhub_done_tasklet);
+static DECLARE_TASKLET_DISABLED_OLD(pe_rle_err_tasklet, pe_rle_do_err_tasklet);
+static DECLARE_TASKLET_DISABLED_OLD(pe_rle_done_tasklet, pe_rle_do_done_tasklet);
 
 #if (0)
 #define CLEAR_FIGO_INTR    \
@@ -326,13 +326,13 @@ static DECLARE_TASKLET_DISABLED(pe_rle_done_tasklet, pe_rle_do_done_tasklet, 0);
 #if CONFIG_VPP_IOCTL_MSG
 static INT vpp_instat;
 static UINT vpp_intr_timestamp;
-static DEFINE_SEMAPHORE(vpp_sem);
+static DEFINE_SEMAPHORE(vpp_sem, 1);
 #endif
 
 #if (BERLIN_CHIP_VERSION >= BERLIN_BG2)
 #if CONFIG_VIP_IOCTL_MSG
 static UINT vip_intr_timestamp;
-static DEFINE_SEMAPHORE(vip_sem);
+static DEFINE_SEMAPHORE(vip_sem, 1);
 #endif
 #endif
 
@@ -2330,7 +2330,7 @@ static int pe_driver_open(struct inode *inode, struct file *filp)
 #if (BERLIN_CHIP_VERSION >= BERLIN_BG2_A0)
 		vec_num = pe_irqs[IRQ_SM_CEC];
 		err =
-			request_irq(vec_num, pe_devices_vpp_cec_isr, IRQF_DISABLED,
+			request_irq(vec_num, pe_devices_vpp_cec_isr, 0,
 				"pe_module_vpp_cec", pHandle);
 		if (unlikely(err < 0)) {
 			pe_trace("vec_num:%5d, err:%8x\n", vec_num, err);
@@ -2340,7 +2340,7 @@ static int pe_driver_open(struct inode *inode, struct file *filp)
 		vec_num = IRQ_SM_GPIO0;
 		err =
 			request_irq(vec_num, pe_devices_vpp_cec_isr,
-				IRQF_DISABLED | IRQF_SHARED, "pe_module_vpp_cec",
+				IRQF_SHARED, "pe_module_vpp_cec",
 				pHandle);
 		if (unlikely(err < 0)) {
 			pe_trace("vec_num:%5d, err:%8x\n", vec_num, err);
@@ -2351,7 +2351,7 @@ static int pe_driver_open(struct inode *inode, struct file *filp)
 
 	/* register and enable VPP ISR */
 	vec_num = pe_irqs[IRQ_DHUBINTRAVIO0];
-	err = request_irq(vec_num, pe_devices_vpp_isr, IRQF_DISABLED, "pe_module_vpp", pHandle);
+	err = request_irq(vec_num, pe_devices_vpp_isr, 0,"pe_module_vpp", pHandle);
 	if (unlikely(err < 0)) {
 		pe_trace("vec_num:%5d, err:%8x\n", vec_num, err);
 		return err;
@@ -2359,7 +2359,7 @@ static int pe_driver_open(struct inode *inode, struct file *filp)
 #if (BERLIN_CHIP_VERSION >= BERLIN_BG2)
 	/* register and enable VIP ISR */
 	vec_num = pe_irqs[IRQ_DHUBINTRAVIO2];
-	err = request_irq(vec_num, pe_devices_vip_isr, IRQF_DISABLED, "pe_module_vip", pHandle);
+	err = request_irq(vec_num, pe_devices_vip_isr, 0,"pe_module_vip", pHandle);
 	if (unlikely(err < 0)) {
 		pe_trace("vec_num:%5d, err:%8x\n", vec_num, err);
 		return err;
@@ -2368,7 +2368,7 @@ static int pe_driver_open(struct inode *inode, struct file *filp)
 
 	/* register and enable VDEC ISR */
 	vec_num = pe_irqs[IRQ_DHUBINTRVPRO];
-	err = request_irq(vec_num, pe_devices_vdec_isr, IRQF_DISABLED, "pe_module_vdec", pHandle);
+	err = request_irq(vec_num, pe_devices_vdec_isr, 0,"pe_module_vdec", pHandle);
 	if (unlikely(err < 0)) {
 		pe_trace("vec_num:%5d, err:%8x\n", vec_num, err);
 		return err;
@@ -2376,7 +2376,7 @@ static int pe_driver_open(struct inode *inode, struct file *filp)
 
 	/* register and enable audio out ISR */
 	vec_num = pe_irqs[IRQ_DHUBINTRAVIO1];
-	err = request_irq(vec_num, pe_devices_aout_isr, IRQF_DISABLED, "pe_module_aout", pHandle);
+	err = request_irq(vec_num, pe_devices_aout_isr, 0,"pe_module_aout", pHandle);
 	if (unlikely(err < 0)) {
 		pe_trace("vec_num:%5d, err:%8x\n", vec_num, err);
 		return err;
@@ -2384,7 +2384,7 @@ static int pe_driver_open(struct inode *inode, struct file *filp)
 
 	/* register and enable ZSP ISR */
 	vec_num = pe_irqs[IRQ_ZSPINT];
-	err = request_irq(vec_num, pe_devices_zsp_isr, IRQF_DISABLED, "pe_module_zsp", pHandle);
+	err = request_irq(vec_num, pe_devices_zsp_isr, 0,"pe_module_zsp", pHandle);
 	if (unlikely(err < 0))
 	{
 		pe_trace("vec_num:%5d, err:%8x\n", vec_num, err);
@@ -2786,36 +2786,18 @@ static long pe_driver_ioctl_unlocked(struct file *filp, unsigned int cmd,
 	return 0;
 }
 
-static int read_proc_status(char *page, char **start, off_t offset,
-			    int count, int *eof, void *data)
+static int read_proc_status(struct seq_file *m, void *v)
 {
-	int len = 0;
-	int cnt;
-
-	len += snprintf(page + len, count, "%-25s : %d \n", "PE Module IRQ cnt",
-		    vpp_cpcb0_vbi_int_cnt);
-
-	pe_debug("%s OK. (%d / %d)\n", __func__, len, count);
-
-	*eof = 1;
-
-	return ((count < len) ? count : len);
+	seq_printf(m, "%-25s : %d \n", "PE Module IRQ cnt",
+		   vpp_cpcb0_vbi_int_cnt);
+	return 0;
 }
 
-static int read_proc_detail(char *page, char **start, off_t offset,
-			    int count, int *eof, void *data)
+static int read_proc_detail(struct seq_file *m, void *v)
 {
-	int len = 0;
-
-	len +=
-	    snprintf(page + len, count,"%-25s : %d aud %d \n", "PE Module IRQ cnt",
-		    vpp_cpcb0_vbi_int_cnt, vpp_hdmi_audio_int_cnt);
-
-	pe_debug("%s OK. (%d / %d)\n", __func__, len, count);
-
-	*eof = 1;
-
-	return ((count < len) ? count : len);
+	seq_printf(m, "%-25s : %d aud %d \n", "PE Module IRQ cnt",
+		   vpp_cpcb0_vbi_int_cnt, vpp_hdmi_audio_int_cnt);
+	return 0;
 }
 
 /*******************************************************************************
@@ -2873,7 +2855,7 @@ static int __init pe_driver_init(void)
 	pe_debug("setup cdevs device minor [%d]\n", GALOIS_PE_MINOR);
 
 	/* add PE devices to sysfs */
-	pe_dev_class = class_create(THIS_MODULE, PE_DEVICE_NAME);
+	pe_dev_class = class_create(PE_DEVICE_NAME);
 	if (IS_ERR(pe_dev_class)) {
 		pe_error("class_create failed.\n");
 		res = -ENODEV;
@@ -2893,10 +2875,10 @@ static int __init pe_driver_init(void)
 	/* create PE device proc file */
 	pe_driver_procdir = proc_mkdir(PE_DEVICE_NAME, NULL);
 	//pe_driver_procdir->owner = THIS_MODULE;
-	create_proc_read_entry(PE_DEVICE_PROCFILE_STATUS, 0, pe_driver_procdir,
-			       read_proc_status, NULL);
-	create_proc_read_entry(PE_DEVICE_PROCFILE_DETAIL, 0, pe_driver_procdir,
-			       read_proc_detail, NULL);
+	proc_create_single(PE_DEVICE_PROCFILE_STATUS, 0, pe_driver_procdir,
+			   read_proc_status);
+	proc_create_single(PE_DEVICE_PROCFILE_DETAIL, 0, pe_driver_procdir,
+			   read_proc_detail);
 
 	res = pe_agent_driver_init();
 	if (res != 0)

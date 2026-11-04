@@ -18,9 +18,9 @@
 
 #ifndef __API_AVIO_DHUB_H__
 #define __API_AVIO_DHUB_H__
-#include  "../nfc/dHub.h"
+#include  "dHub.h"
 #include "avioDhub.h"
-#include "../nfc/api_dhub.h"
+#include "api_dhub.h"
 
 #define VPP_DHUB_BASE			(MEMMAP_VPP_DHUB_REG_BASE + RA_vppDhub_dHub0)
 #define VPP_HBO_SRAM_BASE		(MEMMAP_VPP_DHUB_REG_BASE + RA_vppDhub_tcm0)

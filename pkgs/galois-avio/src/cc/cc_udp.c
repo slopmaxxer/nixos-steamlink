@@ -104,7 +104,7 @@ HRESULT MV_CC_UDP_Close(pMV_CC_UDPPort_t pPort)
 	MV_CC_DBG_Info("MV_CC_UDP_Close Socket = 0x%08X\n",
 				(unsigned int)pPort->m_Socket);
 
-	sock_release(pPort->m_Socket->sk_socket);
+	netlink_kernel_release(pPort->m_Socket);
 
 	MV_OSAL_Free(pPort);
 
