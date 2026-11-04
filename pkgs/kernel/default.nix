@@ -89,6 +89,20 @@ linux.override {
     WATCHDOG = yes;
     DW_WATCHDOG = yes;
 
+    # Game controllers: the built-in Steam Controller receiver (hid-steam), Xbox pads
+    # (xpad, as in Valve's kernel), PlayStation and Switch pads, and Bluetooth HID.
+    INPUT_JOYSTICK = yes;
+    JOYSTICK_XPAD = module;
+    JOYSTICK_XPAD_FF = yes;
+    JOYSTICK_XPAD_LEDS = yes;
+    HID_STEAM = module;
+    LEDS_CLASS_MULTICOLOR = yes; # for hid-playstation's light bar
+    HID_PLAYSTATION = module;
+    PLAYSTATION_FF = yes;
+    HID_NINTENDO = module;
+    NINTENDO_FF = yes;
+    BT_HIDP = module;
+
     # 512 MiB of RAM: compressed swap in RAM (zramSwap) rather than on the stick.
     SWAP = yes;
     ZRAM = module;
