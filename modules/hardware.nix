@@ -33,7 +33,7 @@ let
           p.util-linux
         ];
         bootDir = cfg.bootDir;
-        dtb = "berlin2cd-valve-steamlink.dtb";
+        dtb = cfg.dtb;
         maxGenerations = toString cfg.generations;
         runScript = ../pkgs/boot/run.sh;
         kexecModule = "${steamlinkPkgs.kexec-load-module}";
@@ -42,6 +42,8 @@ let
     };
 in
 {
+  imports = [ ./video.nix ];
+
   options.hardware.steamlink = {
     enable = lib.mkEnableOption "Valve Steam Link hardware support and the USB kexec boot";
 
@@ -58,6 +60,12 @@ in
         Root partition as the kernel understands it without an initrd
         (`/dev/sdXN`, `PARTUUID=` or `PARTLABEL=`; not `LABEL=` or `/dev/disk/by-*`).
       '';
+    };
+
+    dtb = lib.mkOption {
+      type = lib.types.str;
+      default = "berlin2cd-valve-steamlink.dtb";
+      description = "Device tree (from the kernel's dtbs) that kexec hands to the kernel.";
     };
 
     generations = lib.mkOption {

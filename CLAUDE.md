@@ -20,6 +20,18 @@ flake as input `nixos-steamlink`; nothing personal belongs here.
   checks for x86_64-linux; results in cache.kyouma.net. nixpkgs is locked to the same revision
   as nixfiles so the host shares the cache.
 - Never boot-tested before 2026-11-03; record hardware test results here.
+- Video (`modules/video.nix`, README "Video"): Marvell's AVIO drivers in
+  `pkgs/galois-avio/src` (first commit = verbatim copy from the SDK kernel's
+  `arch/arm/mach-berlin`; port changes on top, keep them minimal and mainline-API only),
+  `pkgs/kernel/berlin-avio.patch` (1:1 map of 0xf7000000 as the vendor kernel did: the
+  drivers dereference physical register addresses; avio DTB with shm/pe/gpio nodes and the
+  shm reservation 0x12000000-0x20000000), `pkgs/steamlink-firmware` (update 930's
+  system/, links and modes replayed from its updater-script). The firmware 930 galois_pe.ko
+  has the same functions as the SDK source. The stock boot runs factory_test/run.sh before
+  PE starts (S01config), so after kexec the hardware is in its bootloader state, as for
+  PE on the stock firmware. Fast module rebuilds: `make -C <kernel.dev>/lib/modules/*/build
+  M=<copy of src> modules` with the cross toolchain and `kernelModuleMakeFlags`.
+  PE_Single_CPU under qemu-arm loads all libraries and stops at mapping /dev/mem (expected).
 - Kernel options: `pkgs/kernel/steamlink_defconfig` (board, from steamlink-debian's 6.1 config)
   plus `structuredExtraConfig` in `pkgs/kernel/default.nix` (systemd/NixOS needs). buildLinux
   kernels skip NixOS's requiredKernelConfig assertions, so check the generated `.configfile`.

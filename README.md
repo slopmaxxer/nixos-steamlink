@@ -5,10 +5,13 @@ NixOS for the original Valve Steam Link (2015; Marvell Berlin BG2CD, 2× Cortex-
 [djmuted/steamlink-debian](https://github.com/djmuted/steamlink-debian). The internal NAND
 is left alone: without the stick, the Steam Link boots Valve's firmware as before.
 
-It is a headless box: Ethernet, USB, Wi-Fi/Bluetooth drivers, SSH. Mainline Linux has no
-driver for its display pipeline, audio or NAND, so HDMI stays dark once NixOS runs. For
-video on the TV (e.g. AirPlay mirroring), use the stock firmware with an app such as
-[steamlink-airplay](https://github.com/slopmaxxer/steamlink-airplay) instead.
+By default it is a headless box: Ethernet, USB, Wi-Fi/Bluetooth drivers, SSH. Mainline
+Linux has no driver for its display pipeline, video decoder or HDMI audio. With
+`hardware.steamlink.video.enable` (experimental, see [Video](#video-experimental)), NixOS
+runs the stock firmware's own media stack on ported vendor drivers instead, so HDMI,
+hardware H.264 decoding and HDMI audio work like on the stock firmware, and stock-firmware
+apps such as [steamlink-airplay](https://github.com/slopmaxxer/steamlink-airplay) run as
+NixOS services.
 
 ## How it boots
 
@@ -92,6 +95,37 @@ Recovery: if a generation does not boot, put the stick into another computer and
 `steamlink/generations/<n>.sh` over `steamlink/factory_test/run.sh` on the `FIRMWARE`
 partition. `steamlink/boot.log` shows what kexec said.
 
+## Video (experimental)
+
+The media hardware (display processor, HDMI TX, H.264 decoder, audio DSP) is driven by
+Marvell's closed userspace, which Valve ships in the firmware: `PE_Single_CPU` (the media
+server) and `libSLVideo`/`libSLAudio` for apps. Underneath, it needs only a few kernel
+drivers, which are GPL and part of Valve's 3.8.13 kernel source in the
+[Steam Link SDK](https://github.com/ValveSoftware/steamlink-sdk). This flake ports them to
+mainline and runs the firmware's userspace in a chroot:
+
+- `pkgs/galois-avio`: `galois_shm` (the media memory pools, `/dev/shm_*`), `galois_cc`
+  (IPC, `/dev/galois_cc`), `galois_pe` (interrupts and DMA hub, `/dev/galois_pe*`),
+  `galois_gpio` (`/dev/gpio`), as out-of-tree modules.
+- `pkgs/kernel/berlin-avio.patch`: the 1:1 register mapping those drivers expect, and
+  `berlin2cd-valve-steamlink-avio.dtb`, which adds their nodes and reserves the 224 MiB
+  the media processors share (Linux keeps 288 MiB, as on the stock firmware).
+- `pkgs/steamlink-firmware`: the root filesystem of Valve's public firmware update 930
+  (unfree, downloaded from Valve at build time).
+- `hardware.steamlink.video.enable` loads the drivers, boots the avio DTB, keeps the
+  bootloader's clocks on (`clk_ignore_unused`) and runs `steamlink-pe.service`.
+  `hardware.steamlink.video.serviceConfig` puts another unit into the same chroot, which is
+  how steamlink-airplay's `services.steamlink-airplay` runs.
+
+```nix
+{
+  hardware.steamlink.video.enable = true;
+}
+```
+
+Status: builds; not yet tested on hardware. `journalctl -u steamlink-pe` and `dmesg | grep
+-i galois` show what the media server and the drivers do.
+
 ## Modules
 
 | Output | What |
@@ -103,11 +137,11 @@ partition. `steamlink/boot.log` shows what kexec said.
 | `packages.<system>` | `linux-steamlink`, `kexec-tools-steamlink`, `example-image` |
 
 Options: `hardware.steamlink.rootDevice` (default `PARTUUID=<sdImage disk id>-02`),
-`.bootDir` (`/boot/firmware`), `.generations` (5).
+`.bootDir` (`/boot/firmware`), `.generations` (5), `.dtb`, `.video.*` (above).
 
 Works: Ethernet, USB, Wi-Fi and Bluetooth drivers + firmware (configure networks
-yourself), temperature sensor, zram swap, nftables. Does not work in mainline: HDMI,
-audio, NAND, DMA, RTC, suspend, reboot/poweroff.
+yourself), temperature sensor, zram swap, nftables. HDMI, video decoding and audio only
+through `hardware.steamlink.video`. Does not work: NAND, RTC, suspend, reboot/poweroff.
 
 ## Credits
 
@@ -121,3 +155,6 @@ audio, NAND, DMA, RTC, suspend, reboot/poweroff.
 ## License
 
 MIT (Nix code and scripts). The kernel config is derived from GPL-2.0 work, see above.
+`pkgs/galois-avio/src` and `pkgs/kernel/berlin-avio.patch` are GPL-2.0 (Marvell's drivers
+from Valve's kernel, and kernel code). The firmware's binaries are Valve's and are not
+part of this repository.
